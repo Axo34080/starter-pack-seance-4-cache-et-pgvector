@@ -6,7 +6,7 @@
 
 ---
 
-## 🏛️ Arborescence Hexagonale du Projet
+## Arborescence Hexagonale du Projet
 
 Le projet respecte les principes de l'Architecture Hexagonale vus en Séance 2 et illustrés à la diapo 16 de la Séance 4 :
 
@@ -34,7 +34,7 @@ starter-seance-4/
 
 ---
 
-## 🚀 Démarrage Rapide
+## Démarrage Rapide
 
 ### 1. Démarrer l'infrastructure Docker
 ```bash
@@ -59,7 +59,7 @@ Le serveur démarre sur `http://localhost:3000`.
 
 ---
 
-## 🎯 Travail Demandé
+## Travail Demandé
 
 ### Partie 1 : Implémenter le Décorateur Cache-Aside
 
