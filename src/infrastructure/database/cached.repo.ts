@@ -1,7 +1,10 @@
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import { Mission, MissionRepository } from '../../core/ports/mission.repository.js';
 
 const NULL_SENTINEL = '@@NULL@@'; // Protection anti-penetration (Diapo 15 & 16)
+const NULL_TTL_SECONDS = 30;
+
+const cacheKey = (id: string) => `logiflow:cache:mission:${id}`;
 
 export class CachedMissionRepository implements MissionRepository {
   constructor(
@@ -11,35 +14,31 @@ export class CachedMissionRepository implements MissionRepository {
   ) {}
 
   async findById(id: string): Promise<Mission | null> {
-    const key = `logiflow:mission:${id}`;
+    const key = cacheKey(id);
 
-    // =========================================================================
-    // TODO ÉTUDIANT (Étape 2 du TP - Pattern Cache-Aside & Diapo 16) :
-    // -------------------------------------------------------------------------
-    // 1. Consulter Redis : const cached = await this.redis.get(key);
-    // 2. Si cached === NULL_SENTINEL -> return null (bloque la Cache Penetration)
-    // 3. Si cached existe -> return JSON.parse(cached) (Cache HIT < 2 ms)
-    // 4. Si Cache MISS :
-    //    a. Interroger PostgreSQL : const mission = await this.postgresRepo.findById(id);
-    //    b. Si !mission : cacher NULL_SENTINEL dans Redis ('EX', 30) et return null
-    //    c. Si mission : réchauffer le cache avec this.ttlSeconds ('EX', this.ttlSeconds)
-    //    d. return mission;
-    // =========================================================================
+    const cached = await this.redis.get(key);
+    if (cached === NULL_SENTINEL) {
+      console.log(`[cache] HIT (null) ${key}`);
+      return null;
+    }
+    if (cached) {
+      console.log(`[cache] HIT ${key}`);
+      return JSON.parse(cached) as Mission;
+    }
 
-    // Pour l'instant, on délègue tout à PostgreSQL (comportement non caché)
-    return this.postgresRepo.findById(id);
+    console.log(`[cache] MISS ${key} -> PostgreSQL`);
+    const mission = await this.postgresRepo.findById(id);
+    if (!mission) {
+      await this.redis.set(key, NULL_SENTINEL, 'EX', NULL_TTL_SECONDS);
+      return null;
+    }
+    await this.redis.set(key, JSON.stringify(mission), 'EX', this.ttlSeconds);
+    return mission;
   }
 
   async save(mission: Mission): Promise<void> {
-    const key = `logiflow:mission:${mission.id}`;
-
-    // =========================================================================
-    // TODO ÉTUDIANT (Étape 2 du TP - Invalidation Active du Cache) :
-    // -------------------------------------------------------------------------
-    // 1. Sauvegarder dans PostgreSQL (source de vérité ACID) : await this.postgresRepo.save(mission);
-    // 2. Invalider la clé de cache correspondante dans Redis : await this.redis.del(key);
-    // =========================================================================
-
-    await this.postgresRepo.save(mission);
+    await this.postgresRepo.save(mission); // 1. Source de vérité ACID
+    await this.redis.del(cacheKey(mission.id)); // 2. Invalidation active
+    console.log(`[cache] DEL ${cacheKey(mission.id)}`);
   }
 }

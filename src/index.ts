@@ -1,5 +1,5 @@
 import Fastify from 'fastify';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import { Mission, MissionRepository } from './core/ports/mission.repository.js';
 import { PostgresMissionRepository } from './infrastructure/database/postgres.repo.js';
 import { CachedMissionRepository } from './infrastructure/database/cached.repo.js';
@@ -44,7 +44,8 @@ fastify.put('/api/missions/:id', async (request, reply) => {
   const { id } = request.params as { id: string };
   const body = (request.body as any) || {};
 
-  const existing = await missionRepository.findById(id);
+  // Écriture : on part de la source de vérité, jamais d'une copie en cache (jusqu'à 60 s de retard)
+  const existing = await postgresRepo.findById(id);
   if (!existing) {
     return reply.status(404).send({ error: 'Mission introuvable' });
   }
@@ -66,7 +67,7 @@ fastify.put('/api/missions/:id', async (request, reply) => {
 const start = async () => {
   try {
     await fastify.listen({ port: 3000, host: '0.0.0.0' });
-    console.log('🚀 Serveur démarré sur http://localhost:3000');
+    console.log('Serveur démarré sur http://localhost:3000');
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
